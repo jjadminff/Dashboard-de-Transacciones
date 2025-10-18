@@ -1,8 +1,6 @@
 💳 Dashboard de Transacciones de Tarjeta de Crédito
 
-
-
-
+<img width="92" height="20" alt="image" src="https://github.com/user-attachments/assets/a9f2ac94-e32d-49b1-bf83-9d2fb6e62889" />
 
 
 Este proyecto permite extraer automáticamente las transacciones bancarias desde tu cuenta de correo electrónico (Hotmail o Gmail) y visualizarlas en un dashboard interactivo desarrollado con Streamlit.
