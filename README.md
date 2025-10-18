@@ -10,6 +10,7 @@ Este proyecto permite extraer automáticamente las transacciones bancarias desde
 El sistema soporta montos en Colones (CRC) y Dólares (USD), categorización automática de gastos, y reportes diarios y mensuales.
 
 📝 Características
+---
 
 🔗 Conexión IMAP a cuentas de correo Hotmail o Gmail.
 
@@ -22,6 +23,7 @@ El sistema soporta montos en Colones (CRC) y Dólares (USD), categorización aut
 🏷 Categorías personalizables (Amazon, Supermercado, Restaurante, etc.).
 
 📊 Dashboard interactivo con:
+---
 
 Tabla detallada de transacciones.
 
@@ -34,6 +36,7 @@ Gráficos de barras y pastel interactivos.
 Identificación del día con mayor gasto por moneda.
 
 🛠 Tecnologías usadas
+---
 
 Python 3.10+
 
@@ -54,6 +57,7 @@ imaplib y email – conexión y lectura de correos vía IMAP.
 re – expresiones regulares para extracción de montos y fechas.
 
 ⚡ Instalación
+---
 
 Clona el repositorio:
 
@@ -62,6 +66,7 @@ cd transacciones-dashboard
 
 
 Crea un entorno virtual e instala dependencias:
+---
 
 python -m venv venv
 # Linux / Mac
@@ -73,6 +78,7 @@ pip install -r requirements.txt
 
 
 Archivo requirements.txt recomendado:
+---
 
 pandas==2.0.3
 streamlit==1.30.0
@@ -82,6 +88,7 @@ openpyxl==3.1.2
 numpy==1.26.2
 
 ⚙️ Configuración
+---
 
 Edita tus credenciales y ajustes en el archivo principal del proyecto:
 
@@ -91,10 +98,13 @@ PASSWORD = 'tu_contraseña_o_contraseña_de_aplicación'
 MAILBOX = 'inbox'
 
 Opcional: Personaliza tus categorías
+---
 
 Puedes definir palabras clave para agrupar transacciones automáticamente según la descripción (ejemplo: “Amazon”, “Supermercado”, “Restaurante”, etc.).
+---
 
 ▶️ Uso
+---
 
 Ejecuta el dashboard localmente con:
 
@@ -102,11 +112,13 @@ streamlit run transacciones_dashboard.py
 
 
 El dashboard se abrirá automáticamente en tu navegador predeterminado.
+---
 
 📅 Solo se mostrarán las transacciones del mes en curso.
 💵 Los montos se separan por moneda y se pueden visualizar por categoría.
 
 🔄 Flujo de trabajo
+---
 
 Llegan los correos de transacciones a tu bandeja de entrada.
 
@@ -119,6 +131,7 @@ Cada transacción se clasifica en una categoría.
 El dashboard genera tablas y gráficos para un análisis rápido.
 
 🔒 Consideraciones de seguridad
+---
 
 Si tu correo tiene autenticación en dos pasos (2FA), usa una contraseña de aplicación.
 
@@ -127,11 +140,13 @@ Nunca compartas tu contraseña directamente.
 Puedes crear un archivo .env para almacenar usuario y contraseña de forma segura.
 
 Ejemplo de .env:
+---
 
 EMAIL_USER=tu_correo@gmail.com
 EMAIL_PASS=tu_contraseña_segura
 
 🤝 Contribuciones
+---
 
 ¡Las contribuciones son bienvenidas!
 Puedes abrir un issue o enviar un pull request si deseas agregar nuevas funciones como:
