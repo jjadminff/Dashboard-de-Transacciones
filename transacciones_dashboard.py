@@ -138,7 +138,7 @@ sum_mensual = df.groupby(['mes','moneda'])['monto'].sum().unstack(fill_value=0)
 sum_categoria_mensual = df.groupby(['mes','categoria','moneda'])['monto'].sum().reset_index()
 
 # --- DASHBOARD ---
-st.title("💳 Dashboard de Transacciones Tarjeta de Credito JJ")
+st.title("💳 Transacciones Tarjeta de Credito JJ")
 
 st.subheader("Suma diaria total (por moneda)")
 st.dataframe(sum_diaria)
@@ -181,3 +181,4 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
+
