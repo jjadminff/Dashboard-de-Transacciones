@@ -136,6 +136,7 @@ categorias = {
     'Pricesmart': ['Pricesmart Costa Rica'],
     'Supermercado': ['mega super', 'mas x menos', 'super belen heredia', 'fresh market', 'sabana de oro', 'super'],
     'Restaurante': ['didi', 'burger', 'restaurant', 'cafe'],
+    'Gasolina': ['ESTACION DE SERVICIO SHEY HEREDIA']
     'Otros': []
 }
 df['categoria'] = df['detalle'].apply(lambda x: asignar_categoria(x, categorias))
@@ -189,4 +190,5 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
+
 
