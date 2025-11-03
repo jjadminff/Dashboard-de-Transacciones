@@ -134,9 +134,11 @@ df['mes'] = df['fecha'].dt.to_period('M').astype(str)
 categorias = {
     'Amazon': ['amazon', 'prime'],
     'Pricesmart': ['Pricesmart Costa Rica'],
-    'Supermercado': ['mega super', 'mas x menos', 'super belen heredia', 'fresh market', 'sabana de oro', 'super'],
+    'Supermercado': ['mega super', 'mas x menos', 'super belen heredia', 'fresh market', 'sabana de oro', 'super', 'MARKET'],
     'Restaurante': ['didi', 'burger', 'restaurant', 'cafe'],
     'Gasolina': ['ESTACION DE SERVICIO SHEY HEREDIA'],
+    'Carnes': ['CARNES CHACA HEREDIA', 'CARNES DON RICARDO ALAJUELA' 'carnes'],
+    'Farmacia': ['FARMACIA'],
     'Otros': []
 }
 df['categoria'] = df['detalle'].apply(lambda x: asignar_categoria(x, categorias))
@@ -190,6 +192,7 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
+
 
 
 
