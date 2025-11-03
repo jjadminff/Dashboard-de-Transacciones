@@ -10,7 +10,7 @@ import altair as alt
 # CONFIGURACIÓN
 IMAP_HOST = 'imap.gmail.com'
 USUARIO = 'jjtransacciones@gmail.com'
-PASSWORD = 'joblzeglxxprjzqr'
+PASSWORD = st.secrets["gmail_password"]  # 🔐 Se lee desde secrets.toml
 MAILBOX = 'inbox'
 
 # --- FUNCIONES AUXILIARES ---
@@ -192,6 +192,7 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
+
 
 
 
