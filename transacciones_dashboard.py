@@ -13,7 +13,7 @@ USUARIO = 'jjtransacciones@gmail.com'
 PASSWORD = st.secrets["gmail_password"]
 MAILBOX = 'inbox'
 
-ASUNTO_CLAVE = 'alerta transacción tarjeta de crédito titular'
+ASUNTO_CLAVE = 'alerta transaccion tarjeta'
 FRASE_CLAVE = 'davibank le notifica que la transacción realizada'
 
 # ================= FUNCIONES AUX =================
@@ -56,20 +56,29 @@ for num in mensajes[0].split():
     msg = email.message_from_bytes(msg_data[0][1])
 
     subject = (msg['Subject'] or '').lower()
-    if ASUNTO_CLAVE not in subject:
-        continue
+subject = subject.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
+
+if ASUNTO_CLAVE not in subject:
+    continue
+
 
     body = ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            if part.get_content_type() == "text/plain":
-                body += part.get_payload(decode=True).decode(errors='ignore')
-    else:
-        body = msg.get_payload(decode=True).decode(errors='ignore')
+if msg.is_multipart():
+    for part in msg.walk():
+        if part.get_content_type() in ["text/plain", "text/html"]:
+            body += part.get_payload(decode=True).decode(errors='ignore')
+else:
+    body = msg.get_payload(decode=True).decode(errors='ignore')
 
     body_lower = body.lower()
-    if FRASE_CLAVE not in body_lower or 'fue aprobada' not in body_lower:
-        continue
+    if 'davibank le notifica que la transaccion realizada' not in body:
+    continue
+
+    if 'fue aprobada' not in body:
+    continue
+
+st.write("Correo válido encontrado")
+st.write(subject)
 
     match = PATRON_TRANSACCION.search(body)
     if not match:
@@ -156,3 +165,4 @@ if 'CRC' in sum_diaria:
 if 'USD' in sum_diaria:
     d = sum_diaria['USD'].idxmax()
     st.write(f"Mayor gasto en USD: ${sum_diaria.loc[d,'USD']:,.2f} el día {d.date()}")
+
