@@ -5,77 +5,50 @@ import pandas as pd
 from datetime import datetime, date
 import streamlit as st
 import altair as alt
+import unicodedata
 
-# ================= CONFIGURACIÓN =================
+# ================= CONFIG =================
 IMAP_HOST = 'imap.gmail.com'
 USUARIO = 'jjtransacciones@gmail.com'
 PASSWORD = st.secrets["gmail_password"]
 MAILBOX = 'inbox'
 
-FROM_VALIDO = 'alertas@davibank.cr'
-ASUNTO_CLAVE = 'alerta transaccion tarjeta'
-FRASE_CLAVE = 'davibank le notifica que la transaccion realizada'
+# ================= HELPERS =================
+def normalize_text(text):
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    return text.lower()
 
-# ================= FUNCIONES AUX =================
-def normalize_text(s: str) -> str:
-    return (
-        s.lower()
-        .replace('á','a')
-        .replace('é','e')
-        .replace('í','i')
-        .replace('ó','o')
-        .replace('ú','u')
-    )
-
-def normalize_number_text(s):
+def normalize_number(s):
     return s.replace(',', '')
 
-def asignar_categoria(texto, categorias):
-    texto = str(texto).lower()
-    for cat, keywords in categorias.items():
-        if any(k in texto for k in keywords):
-            return cat
-    return 'Otros'
-
 # ================= REGEX DAVIBANK =================
-PATRON_TRANSACCION = re.compile(
+PATRON = re.compile(
     r'davibank le notifica que la transaccion realizada en\s+'
-    r'(?P<comercio>.+?),\s+el dia\s+'
+    r'(?P<comercio>.+?)\s+costa rica,?\s+el dia\s+'
     r'(?P<fecha>\d{2}/\d{2}/\d{4})\s+a\s+'
     r'(?P<hora>\d{2}:\d{2}\s+[ap]m).*?'
-    r'por\s+(?P<moneda>CRC|USD)\s+'
+    r'por\s+(?P<moneda>crc|usd)\s+'
     r'(?P<monto>\d{1,3}(?:,\d{3})*(?:\.\d{2}))',
     re.IGNORECASE | re.DOTALL
 )
 
-# ================= CONEXIÓN IMAP =================
+# ================= IMAP =================
 mail = imaplib.IMAP4_SSL(IMAP_HOST)
 mail.login(USUARIO, PASSWORD)
 mail.select(MAILBOX)
 
-status, mensajes = mail.search(None, '(ALL)')
+status, mensajes = mail.search(None, 'ALL')
+
 data = []
-
 hoy = date.today()
-mes_actual = hoy.month
-anio_actual = hoy.year
 
-# ================= LECTURA DE CORREOS =================
+# ================= READ EMAILS =================
 for num in mensajes[0].split():
     status, msg_data = mail.fetch(num, '(RFC822)')
     msg = email.message_from_bytes(msg_data[0][1])
 
-    # ---------- FILTRO FROM ----------
-    from_raw = msg.get('From', '')
-    if FROM_VALIDO not in from_raw.lower():
-        continue
-
-    # ---------- FILTRO SUBJECT ----------
-    subject = normalize_text(msg.get('Subject', ''))
-    if ASUNTO_CLAVE not in subject:
-        continue
-
-    # ---------- BODY ----------
+    # --- BODY ---
     body = ""
     if msg.is_multipart():
         for part in msg.walk():
@@ -86,13 +59,13 @@ for num in mensajes[0].split():
 
     body_norm = normalize_text(body)
 
-    if FRASE_CLAVE not in body_norm:
+    # --- FILTRO DAVIBANK REAL ---
+    if 'davibank le notifica que la transaccion realizada' not in body_norm:
         continue
-
     if 'fue aprobada' not in body_norm:
         continue
 
-    match = PATRON_TRANSACCION.search(body_norm)
+    match = PATRON.search(body_norm)
     if not match:
         continue
 
@@ -101,20 +74,19 @@ for num in mensajes[0].split():
         "%d/%m/%Y %I:%M %p"
     ).date()
 
-    if fecha_tx.month != mes_actual or fecha_tx.year != anio_actual:
+    if fecha_tx.month != hoy.month or fecha_tx.year != hoy.year:
         continue
 
-    monto = float(normalize_number_text(match.group('monto')))
+    monto = float(normalize_number(match.group('monto')))
     moneda = match.group('moneda').upper()
     comercio = match.group('comercio').strip()
 
-    if 0 < monto < 10_000_000:
-        data.append({
-            'fecha': fecha_tx,
-            'monto': monto,
-            'moneda': moneda,
-            'detalle': comercio
-        })
+    data.append({
+        'fecha': fecha_tx,
+        'monto': monto,
+        'moneda': moneda,
+        'detalle': comercio
+    })
 
 mail.logout()
 
@@ -122,61 +94,26 @@ mail.logout()
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.warning("No se encontraron transacciones DAVIbank en el mes actual.")
+    st.error("❌ No se encontraron transacciones DAVIbank en el mes actual.")
     st.stop()
 
-st.subheader("Detalle de transacciones")
-st.dataframe(df[['fecha','monto','moneda','detalle']])
+# ================= DASHBOARD =================
+st.title("💳 Transacciones Tarjeta de Crédito – DAVIbank")
+
+st.subheader("Detalle")
+st.dataframe(df)
 
 df['fecha'] = pd.to_datetime(df['fecha'])
 df['mes'] = df['fecha'].dt.to_period('M').astype(str)
 
-# ================= CATEGORÍAS =================
-categorias = {
-    'Amazon': ['amazon', 'prime'],
-    'Pricesmart': ['pricesmart'],
-    'Supermercado': ['super', 'market'],
-    'Restaurante': ['restaurant', 'food', 'cafe', 'soda'],
-    'Gasolina': ['estacion'],
-    'Carnes': ['carnes'],
-    'Farmacia': ['farmacia'],
-    'Otros': []
-}
+resumen = df.groupby(['fecha','moneda'])['monto'].sum().unstack(fill_value=0)
+st.subheader("Suma diaria")
+st.dataframe(resumen)
 
-df['categoria'] = df['detalle'].apply(lambda x: asignar_categoria(x, categorias))
-
-# ================= RESÚMENES =================
-sum_diaria = df.groupby(['fecha','moneda'])['monto'].sum().unstack(fill_value=0)
-sum_mensual = df.groupby(['mes','moneda'])['monto'].sum().unstack(fill_value=0)
-sum_categoria_mensual = df.groupby(['mes','categoria','moneda'])['monto'].sum().reset_index()
-
-# ================= DASHBOARD =================
-st.title("💳 Transacciones Tarjeta de Crédito JJ")
-
-st.subheader("Suma diaria total (por moneda)")
-st.dataframe(sum_diaria)
-
-st.subheader("Suma mensual total (por moneda)")
-st.dataframe(sum_mensual)
-
-st.subheader("Resumen mensual por categoría (por moneda)")
-st.dataframe(sum_categoria_mensual)
-
-chart = alt.Chart(sum_categoria_mensual).mark_bar().encode(
-    x='categoria:N',
+chart = alt.Chart(df).mark_bar().encode(
+    x='fecha:T',
     y='monto:Q',
     color='moneda:N',
-    column='mes:N'
+    tooltip=['detalle','monto']
 )
 st.altair_chart(chart, use_container_width=True)
-
-# ================= DÍA MAYOR GASTO =================
-st.subheader("📈 Día con mayor gasto por moneda")
-
-if 'CRC' in sum_diaria:
-    d = sum_diaria['CRC'].idxmax()
-    st.write(f"Mayor gasto en CRC: ₡{sum_diaria.loc[d,'CRC']:,.2f} el día {d.date()}")
-
-if 'USD' in sum_diaria:
-    d = sum_diaria['USD'].idxmax()
-    st.write(f"Mayor gasto en USD: ${sum_diaria.loc[d,'USD']:,.2f} el día {d.date()}")
