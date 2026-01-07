@@ -4,7 +4,6 @@ import re
 import pandas as pd
 from datetime import datetime, date
 import streamlit as st
-import matplotlib.pyplot as plt
 import altair as alt
 
 # ================= CONFIGURACIÓN =================
@@ -13,17 +12,28 @@ USUARIO = 'jjtransacciones@gmail.com'
 PASSWORD = st.secrets["gmail_password"]
 MAILBOX = 'inbox'
 
+FROM_VALIDO = 'alertas@davibank.cr'
 ASUNTO_CLAVE = 'alerta transaccion tarjeta'
-FRASE_CLAVE = 'davibank le notifica que la transacción realizada'
+FRASE_CLAVE = 'davibank le notifica que la transaccion realizada'
 
 # ================= FUNCIONES AUX =================
+def normalize_text(s: str) -> str:
+    return (
+        s.lower()
+        .replace('á','a')
+        .replace('é','e')
+        .replace('í','i')
+        .replace('ó','o')
+        .replace('ú','u')
+    )
+
 def normalize_number_text(s):
     return s.replace(',', '')
 
 def asignar_categoria(texto, categorias):
     texto = str(texto).lower()
     for cat, keywords in categorias.items():
-        if any(k.lower() in texto for k in keywords):
+        if any(k in texto for k in keywords):
             return cat
     return 'Otros'
 
@@ -55,30 +65,32 @@ for num in mensajes[0].split():
     status, msg_data = mail.fetch(num, '(RFC822)')
     msg = email.message_from_bytes(msg_data[0][1])
 
-    subject = (msg['Subject'] or '').lower()
-subject = subject.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
+    # ---------- FILTRO FROM ----------
+    from_raw = msg.get('From', '')
+    if FROM_VALIDO not in from_raw.lower():
+        continue
 
-if ASUNTO_CLAVE not in subject:
-    continue
+    # ---------- FILTRO SUBJECT ----------
+    subject = normalize_text(msg.get('Subject', ''))
+    if ASUNTO_CLAVE not in subject:
+        continue
 
-
+    # ---------- BODY ----------
     body = ""
-if msg.is_multipart():
-    for part in msg.walk():
-        if part.get_content_type() in ["text/plain", "text/html"]:
-            body += part.get_payload(decode=True).decode(errors='ignore')
-else:
-    body = msg.get_payload(decode=True).decode(errors='ignore')
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() in ("text/plain", "text/html"):
+                body += part.get_payload(decode=True).decode(errors='ignore')
+    else:
+        body = msg.get_payload(decode=True).decode(errors='ignore')
 
-    body_lower = body.lower()
-    if 'davibank le notifica que la transaccion realizada' not in body:
+    body_norm = normalize_text(body)
 
+    if FRASE_CLAVE not in body_norm:
+        continue
 
-    if 'fue aprobada' not in body:
-    continue
-
-st.write("Correo válido encontrado")
-st.write(subject)
+    if 'fue aprobada' not in body_norm:
+        continue
 
     match = PATRON_TRANSACCION.search(body)
     if not match:
@@ -96,7 +108,7 @@ st.write(subject)
     moneda = match.group('moneda').upper()
     comercio = match.group('comercio').strip()
 
-    if 0 < monto < 10000000:
+    if 0 < monto < 10_000_000:
         data.append({
             'fecha': fecha_tx,
             'monto': monto,
@@ -108,6 +120,7 @@ mail.logout()
 
 # ================= DATAFRAME =================
 df = pd.DataFrame(data)
+
 if df.empty:
     st.warning("No se encontraron transacciones DAVIbank en el mes actual.")
     st.stop()
@@ -122,8 +135,8 @@ df['mes'] = df['fecha'].dt.to_period('M').astype(str)
 categorias = {
     'Amazon': ['amazon', 'prime'],
     'Pricesmart': ['pricesmart'],
-    'Supermercado': ['super', 'market', 'soda'],
-    'Restaurante': ['soda', 'restaurant', 'food', 'cafe'],
+    'Supermercado': ['super', 'market'],
+    'Restaurante': ['restaurant', 'food', 'cafe', 'soda'],
     'Gasolina': ['estacion'],
     'Carnes': ['carnes'],
     'Farmacia': ['farmacia'],
@@ -159,11 +172,11 @@ st.altair_chart(chart, use_container_width=True)
 
 # ================= DÍA MAYOR GASTO =================
 st.subheader("📈 Día con mayor gasto por moneda")
+
 if 'CRC' in sum_diaria:
     d = sum_diaria['CRC'].idxmax()
     st.write(f"Mayor gasto en CRC: ₡{sum_diaria.loc[d,'CRC']:,.2f} el día {d.date()}")
+
 if 'USD' in sum_diaria:
     d = sum_diaria['USD'].idxmax()
     st.write(f"Mayor gasto en USD: ${sum_diaria.loc[d,'USD']:,.2f} el día {d.date()}")
-
-
