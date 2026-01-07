@@ -30,9 +30,12 @@ def asignar_categoria(texto, categorias):
 
 # ================= REGEX DAVIBANK =================
 PATRON_TRANSACCION = re.compile(
-    r'transacción realizada en\s+(?P<comercio>.+?),\s+el día\s+'
-    r'(?P<fecha>\d{2}/\d{2}/\d{4})\s+a\s+(?P<hora>\d{2}:\d{2}\s+[AP]M).*?'
-    r'por\s+(?P<moneda>CRC|USD)\s+(?P<monto>\d{1,3}(?:,\d{3})*(?:\.\d{2}))',
+    r'DAVIbank le notifica que la transacción realizada en\s+'
+    r'(?P<comercio>.+?),\s+el día\s+'
+    r'(?P<fecha>\d{2}/\d{2}/\d{4})\s+a\s+'
+    r'(?P<hora>\d{2}:\d{2}\s+[AP]M).*?'
+    r'por\s+(?P<moneda>CRC|USD)\s+'
+    r'(?P<monto>\d{1,3}(?:,\d{3})*(?:\.\d{2}))',
     re.IGNORECASE | re.DOTALL
 )
 
@@ -167,3 +170,4 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: ₡{sum_diaria.loc[mayor_dia_crc,'CRC']:,.2f} el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${sum_diaria.loc[mayor_dia_usd,'USD']:,.2f} el día {mayor_dia_usd.date()}")
+
