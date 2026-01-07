@@ -72,7 +72,7 @@ else:
 
     body_lower = body.lower()
     if 'davibank le notifica que la transaccion realizada' not in body:
-    continue
+
 
     if 'fue aprobada' not in body:
     continue
@@ -165,4 +165,5 @@ if 'CRC' in sum_diaria:
 if 'USD' in sum_diaria:
     d = sum_diaria['USD'].idxmax()
     st.write(f"Mayor gasto en USD: ${sum_diaria.loc[d,'USD']:,.2f} el día {d.date()}")
+
 
