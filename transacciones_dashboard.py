@@ -13,13 +13,12 @@ USUARIO = 'jjtransacciones@gmail.com'
 PASSWORD = st.secrets["gmail_password"]
 MAILBOX = 'inbox'
 
-REMITENTE_VALIDO = 'alertas@davibank.cr'
+ASUNTO_CLAVE = 'alerta transacción tarjeta de crédito titular'
 FRASE_CLAVE = 'davibank le notifica que la transacción realizada'
 
 # ================= FUNCIONES AUX =================
 def normalize_number_text(s):
-    s = s.strip().replace(',', '')
-    return s
+    return s.replace(',', '')
 
 def asignar_categoria(texto, categorias):
     texto = str(texto).lower()
@@ -56,8 +55,8 @@ for num in mensajes[0].split():
     status, msg_data = mail.fetch(num, '(RFC822)')
     msg = email.message_from_bytes(msg_data[0][1])
 
-    from_email = email.utils.parseaddr(msg['From'])[1].lower()
-    if from_email != REMITENTE_VALIDO:
+    subject = (msg['Subject'] or '').lower()
+    if ASUNTO_CLAVE not in subject:
         continue
 
     body = ""
@@ -114,9 +113,9 @@ df['mes'] = df['fecha'].dt.to_period('M').astype(str)
 categorias = {
     'Amazon': ['amazon', 'prime'],
     'Pricesmart': ['pricesmart'],
-    'Supermercado': ['super', 'market', 'mas x menos', 'fresh market'],
-    'Restaurante': ['didi', 'burger', 'restaurant', 'food', 'cafe'],
-    'Gasolina': ['estacion de servicio'],
+    'Supermercado': ['super', 'market', 'soda'],
+    'Restaurante': ['soda', 'restaurant', 'food', 'cafe'],
+    'Gasolina': ['estacion'],
     'Carnes': ['carnes'],
     'Farmacia': ['farmacia'],
     'Otros': []
@@ -141,33 +140,19 @@ st.dataframe(sum_mensual)
 st.subheader("Resumen mensual por categoría (por moneda)")
 st.dataframe(sum_categoria_mensual)
 
-# ================= GRÁFICOS =================
 chart = alt.Chart(sum_categoria_mensual).mark_bar().encode(
-    x=alt.X('categoria:N', title='Categoría'),
-    y=alt.Y('monto:Q', title='Monto'),
+    x='categoria:N',
+    y='monto:Q',
     color='moneda:N',
     column='mes:N'
 )
 st.altair_chart(chart, use_container_width=True)
 
-ultimo_mes = sum_categoria_mensual['mes'].max()
-df_ultimo_mes = sum_categoria_mensual[sum_categoria_mensual['mes'] == ultimo_mes]
-
-for moneda in ['CRC','USD']:
-    df_moneda = df_ultimo_mes[df_ultimo_mes['moneda'] == moneda]
-    if not df_moneda.empty:
-        st.subheader(f"Gastos por categoría en {moneda} - último mes")
-        fig, ax = plt.subplots(figsize=(5,5))
-        ax.pie(df_moneda['monto'], labels=df_moneda['categoria'], autopct='%1.1f%%')
-        st.pyplot(fig)
-
 # ================= DÍA MAYOR GASTO =================
-mayor_dia_crc = sum_diaria['CRC'].idxmax() if 'CRC' in sum_diaria.columns else None
-mayor_dia_usd = sum_diaria['USD'].idxmax() if 'USD' in sum_diaria.columns else None
-
 st.subheader("📈 Día con mayor gasto por moneda")
-if mayor_dia_crc:
-    st.write(f"Mayor gasto en CRC: ₡{sum_diaria.loc[mayor_dia_crc,'CRC']:,.2f} el día {mayor_dia_crc.date()}")
-if mayor_dia_usd:
-    st.write(f"Mayor gasto en USD: ${sum_diaria.loc[mayor_dia_usd,'USD']:,.2f} el día {mayor_dia_usd.date()}")
-
+if 'CRC' in sum_diaria:
+    d = sum_diaria['CRC'].idxmax()
+    st.write(f"Mayor gasto en CRC: ₡{sum_diaria.loc[d,'CRC']:,.2f} el día {d.date()}")
+if 'USD' in sum_diaria:
+    d = sum_diaria['USD'].idxmax()
+    st.write(f"Mayor gasto en USD: ${sum_diaria.loc[d,'USD']:,.2f} el día {d.date()}")
