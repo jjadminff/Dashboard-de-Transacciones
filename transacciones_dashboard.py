@@ -1,4 +1,3 @@
-```python
 import imaplib
 import email
 import re
@@ -230,4 +229,3 @@ if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
-```
