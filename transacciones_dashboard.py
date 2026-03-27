@@ -1,3 +1,4 @@
+```python
 import imaplib
 import email
 import re
@@ -10,8 +11,11 @@ import altair as alt
 # CONFIGURACIÓN
 IMAP_HOST = 'imap.gmail.com'
 USUARIO = 'jjtransacciones@gmail.com'
-PASSWORD = st.secrets["gmail_password"]  # 🔐 Se lee desde secrets.toml
+PASSWORD = st.secrets["gmail_password"]
 MAILBOX = 'inbox'
+
+# 🔥 LÍMITE SEMANAL
+LIMITE_SEMANAL = 175000
 
 # --- FUNCIONES AUXILIARES ---
 def normalize_number_text(s):
@@ -62,7 +66,7 @@ for num in mensajes[0].split():
     from_ = msg['From'].lower() if msg['From'] else ''
     subject = msg['Subject'].lower() if msg['Subject'] else ''
 
-    # --- FILTRO: ignorar newsletters/promociones ---
+    # FILTRO: ignorar promos
     if any(x in subject for x in ["promoción", "sorteo", "ganador", "campaña"]) or \
        any(x in from_ for x in ["scotiabankca.net", "marketing", "newsletter"]):
         continue
@@ -83,11 +87,10 @@ for num in mensajes[0].split():
         if not line:
             continue
 
-        # Extraer fecha de transacción del texto
         fecha_match = re.search(r'(\d{2}/\d{2}/\d{4})', line)
         fecha_linea = datetime.strptime(fecha_match.group(1), '%d/%m/%Y').date() if fecha_match else fecha_correo
 
-        # --- FILTRO: solo mes en curso ---
+        # FILTRO: solo mes actual
         if fecha_linea.month != mes_actual or fecha_linea.year != anio_actual:
             continue
 
@@ -101,7 +104,9 @@ for num in mensajes[0].split():
                 monto = float(limpio)
             except:
                 continue
+
             tipo_moneda = 'USD' if moneda_raw.strip().upper() in ['USD', '$'] else 'CRC'
+
             if 0 < monto < 10000000:
                 data.append({'fecha': fecha_linea, 'monto': monto, 'moneda': tipo_moneda, 'detalle': line})
 
@@ -119,28 +124,34 @@ for num in mensajes[0].split():
 
 mail.logout()
 
-# --- CREAR DATAFRAME ---
+# --- DATAFRAME ---
 df = pd.DataFrame(data)
+
 if df.empty:
     st.warning("No se encontraron montos válidos en el mes en curso.")
 else:
     st.subheader("Detalle de transacciones")
     st.dataframe(df[['fecha','monto','moneda','detalle']])
 
+# --- FECHAS ---
 df['fecha'] = pd.to_datetime(df['fecha'])
 df['mes'] = df['fecha'].dt.to_period('M').astype(str)
+
+# 🔥 NUEVO: SEMANA
+df['semana'] = df['fecha'].dt.to_period('W').astype(str)
 
 # --- CATEGORÍAS ---
 categorias = {
     'Amazon': ['amazon', 'prime'],
-    'Pricesmart': ['Pricesmart Costa Rica', 'PRICE SMART SAN JOSE'],
-    'Supermercado': ['mega super', 'mas x menos', 'super belen heredia', 'fresh market', 'sabana de oro', 'super', 'MARKET'],
+    'Pricesmart': ['pricesmart costa rica', 'price smart san jose'],
+    'Supermercado': ['mega super', 'mas x menos', 'super belen heredia', 'fresh market', 'sabana de oro', 'super', 'market'],
     'Restaurante': ['didi', 'burger', 'restaurant', 'food', 'cafe'],
-    'Gasolina': ['ESTACION DE SERVICIO SHEY HEREDIA'],
-    'Carnes': ['CARNES CHACA HEREDIA', 'CARNES DON RICARDO ALAJUELA' 'carnes'],
-    'Farmacia': ['FARMACIA'],
+    'Gasolina': ['estacion de servicio', 'gasolina', 'shey'],
+    'Carnes': ['carnes chaca heredia', 'carnes don ricardo alajuela', 'carnes'],
+    'Farmacia': ['farmacia'],
     'Otros': []
 }
+
 df['categoria'] = df['detalle'].apply(lambda x: asignar_categoria(x, categorias))
 
 # --- RESÚMENES ---
@@ -148,11 +159,17 @@ sum_diaria = df.groupby(['fecha','moneda'])['monto'].sum().unstack(fill_value=0)
 sum_mensual = df.groupby(['mes','moneda'])['monto'].sum().unstack(fill_value=0)
 sum_categoria_mensual = df.groupby(['mes','categoria','moneda'])['monto'].sum().reset_index()
 
+# 🔥 NUEVO: RESUMEN SEMANAL
+sum_semanal = df.groupby(['semana','moneda'])['monto'].sum().unstack(fill_value=0)
+
 # --- DASHBOARD ---
 st.title("💳 Transacciones Tarjeta de Credito JJ")
 
 st.subheader("Suma diaria total (por moneda)")
 st.dataframe(sum_diaria)
+
+st.subheader("Suma semanal (control de gasto)")
+st.dataframe(sum_semanal)
 
 st.subheader("Suma mensual total (por moneda)")
 st.dataframe(sum_mensual)
@@ -160,7 +177,26 @@ st.dataframe(sum_mensual)
 st.subheader("Resumen mensual por categoría (por moneda)")
 st.dataframe(sum_categoria_mensual)
 
-# --- GRÁFICO BARRAS AGRUPADAS POR MONEDA ---
+# --- ALERTA SEMANAL ---
+ultima_semana = sum_semanal.index.max()
+gasto_semana_crc = sum_semanal.loc[ultima_semana, 'CRC'] if 'CRC' in sum_semanal.columns else 0
+
+st.subheader("🚨 Control de presupuesto semanal")
+
+if gasto_semana_crc > LIMITE_SEMANAL:
+    st.error(f"⚠️ Te pasaste: ₡{gasto_semana_crc:,.0f} (límite ₡{LIMITE_SEMANAL:,.0f})")
+elif gasto_semana_crc > LIMITE_SEMANAL * 0.8:
+    st.warning(f"⚠️ Cuidado: ₡{gasto_semana_crc:,.0f} (80% del límite)")
+else:
+    st.success(f"✅ Bien: ₡{gasto_semana_crc:,.0f} dentro del límite")
+
+# 🔥 TOP GASTOS SEMANA
+st.subheader("🔎 Top gastos de la semana actual")
+df_semana_actual = df[df['semana'] == ultima_semana]
+top_gastos = df_semana_actual.sort_values(by='monto', ascending=False).head(10)
+st.dataframe(top_gastos[['fecha','monto','categoria','detalle']])
+
+# --- GRÁFICOS ---
 chart = alt.Chart(sum_categoria_mensual).mark_bar().encode(
     x=alt.X('categoria:N', title='Categoría'),
     y=alt.Y('monto:Q', title='Monto'),
@@ -169,9 +205,10 @@ chart = alt.Chart(sum_categoria_mensual).mark_bar().encode(
 )
 st.altair_chart(chart, use_container_width=True)
 
-# --- GRÁFICO PIE DEL ÚLTIMO MES ---
+# --- PIE ---
 ultimo_mes = sum_categoria_mensual['mes'].max()
 df_ultimo_mes = sum_categoria_mensual[sum_categoria_mensual['mes'] == ultimo_mes]
+
 for moneda in ['CRC','USD']:
     df_moneda = df_ultimo_mes[df_ultimo_mes['moneda'] == moneda]
     if not df_moneda.empty:
@@ -180,7 +217,7 @@ for moneda in ['CRC','USD']:
         ax.pie(df_moneda['monto'], labels=df_moneda['categoria'], autopct='%1.1f%%')
         st.pyplot(fig)
 
-# --- DÍA CON MAYOR GASTO POR MONEDA ---
+# --- MAYOR DÍA ---
 mayor_dia_crc = sum_diaria['CRC'].idxmax() if 'CRC' in sum_diaria.columns else None
 mayor_dia_usd = sum_diaria['USD'].idxmax() if 'USD' in sum_diaria.columns else None
 
@@ -188,14 +225,9 @@ total_crc = sum_diaria.loc[mayor_dia_crc, 'CRC'] if mayor_dia_crc else 0
 total_usd = sum_diaria.loc[mayor_dia_usd, 'USD'] if mayor_dia_usd else 0
 
 st.subheader("📈 Día con mayor gasto por moneda")
+
 if mayor_dia_crc:
     st.write(f"Mayor gasto en CRC: {total_crc:,.2f} ₡ el día {mayor_dia_crc.date()}")
 if mayor_dia_usd:
     st.write(f"Mayor gasto en USD: ${total_usd:,.2f} el día {mayor_dia_usd.date()}")
-
-
-
-
-
-
-
+```
