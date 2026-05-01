@@ -128,6 +128,7 @@ df = pd.DataFrame(data)
 
 if df.empty:
     st.warning("No se encontraron montos válidos en el mes en curso.")
+    st.stop()
 else:
     st.subheader("Detalle de transacciones")
     st.dataframe(df[['fecha','monto','moneda','detalle']])
