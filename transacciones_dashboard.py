@@ -142,11 +142,21 @@ for num in mensajes[0].split():
 mail.logout()
 
 # --- DATAFRAME ROBUSTO ---
-df = pd.DataFrame(data, columns=['fecha','monto','moneda','detalle'])
-
-if df.empty:
+if not data:
     st.warning("No se encontraron montos válidos en el mes en curso.")
-    st.stop()  # 🔥 CLAVE
+
+    # 🔥 DataFrame seguro con columnas SIEMPRE
+    df = pd.DataFrame({
+        'fecha': [],
+        'monto': [],
+        'moneda': [],
+        'detalle': []
+    })
+
+    st.stop()
+
+# 🔥 solo se construye si hay datos reales
+df = pd.DataFrame(data)
 
 # --- FECHAS ---
 df['fecha'] = pd.to_datetime(df['fecha'])
