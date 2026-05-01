@@ -6,7 +6,7 @@ from datetime import datetime, date
 import streamlit as st
 import matplotlib.pyplot as plt
 import altair as alt
-from bs4 import BeautifulSoup  # 🔥 NUEVO
+from bs4 import BeautifulSoup
 
 # CONFIGURACIÓN
 IMAP_HOST = 'imap.gmail.com'
@@ -57,8 +57,8 @@ hoy = date.today()
 mes_actual = hoy.month
 anio_actual = hoy.year
 
-currency_pat = re.compile(r'(?P<cur>CRC|₡|USD|\$)\s*(?P<val>\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)', re.IGNORECASE)
-decimal_pat = re.compile(r'(?P<val>\d{1,3}(?:[.,]\d{3})*[.,]\d{2})')
+# 🔥 Regex más tolerante
+currency_pat = re.compile(r'(CRC|₡|USD|\$)\s*([\d.,]+)', re.IGNORECASE)
 
 for num in mensajes[0].split():
     status, msg_data = mail.fetch(num, '(RFC822)')
@@ -79,7 +79,6 @@ for num in mensajes[0].split():
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
-
             try:
                 payload = part.get_payload(decode=True).decode(errors='ignore')
             except:
@@ -87,75 +86,48 @@ for num in mensajes[0].split():
 
             if content_type == "text/plain":
                 body += payload
-
             elif content_type == "text/html":
                 soup = BeautifulSoup(payload, "html.parser")
                 body += soup.get_text()
     else:
         body = msg.get_payload(decode=True).decode(errors='ignore')
 
-    # DEBUG opcional
-    # st.write("BODY PREVIEW:", body[:300])
+    # 🔥 Normalizar texto
+    texto = body.replace('\n', ' ').replace('\xa0', ' ')
 
-    for line in body.splitlines():
-        line = line.strip()
-        if not line:
+    # 🔥 Buscar montos en todo el texto
+    for m in currency_pat.finditer(texto):
+        moneda_raw = m.group(1)
+        valor_raw = m.group(2)
+
+        limpio = normalize_number_text(valor_raw)
+
+        try:
+            monto = float(limpio)
+        except:
             continue
 
-        fecha_match = re.search(r'(\d{2}/\d{2}/\d{4})', line)
-        fecha_linea = datetime.strptime(fecha_match.group(1), '%d/%m/%Y').date() if fecha_match else fecha_correo
+        tipo_moneda = 'USD' if moneda_raw.strip().upper() in ['USD', '$'] else 'CRC'
 
-        if fecha_linea.month != mes_actual or fecha_linea.year != anio_actual:
+        # FILTRO: solo mes actual
+        if fecha_correo.month != mes_actual or fecha_correo.year != anio_actual:
             continue
 
-        matched_any = False
-
-        for m in currency_pat.finditer(line):
-            matched_any = True
-            moneda_raw = m.group('cur') or ''
-            valor_raw = m.group('val')
-
-            limpio = normalize_number_text(valor_raw)
-            try:
-                monto = float(limpio)
-            except:
-                continue
-
-            tipo_moneda = 'USD' if moneda_raw.strip().upper() in ['USD', '$'] else 'CRC'
-
-            if 0 < monto < 10000000:
-                data.append({'fecha': fecha_linea, 'monto': monto, 'moneda': tipo_moneda, 'detalle': line})
-
-        if not matched_any:
-            for m in decimal_pat.finditer(line):
-                valor_raw = m.group('val')
-                limpio = normalize_number_text(valor_raw)
-
-                try:
-                    monto = float(limpio)
-                except:
-                    continue
-
-                if 0 < monto < 10000000:
-                    data.append({'fecha': fecha_linea, 'monto': monto, 'moneda': 'CRC', 'detalle': line})
+        if 0 < monto < 10000000:
+            data.append({
+                'fecha': fecha_correo,
+                'monto': monto,
+                'moneda': tipo_moneda,
+                'detalle': texto[:200]
+            })
 
 mail.logout()
 
-# --- DATAFRAME ROBUSTO ---
+# --- DATAFRAME SEGURO ---
 if not data:
     st.warning("No se encontraron montos válidos en el mes en curso.")
-
-    # 🔥 DataFrame seguro con columnas SIEMPRE
-    df = pd.DataFrame({
-        'fecha': [],
-        'monto': [],
-        'moneda': [],
-        'detalle': []
-    })
-
     st.stop()
 
-# 🔥 solo se construye si hay datos reales
 df = pd.DataFrame(data)
 
 # --- FECHAS ---
